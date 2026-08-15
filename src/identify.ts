@@ -11,6 +11,7 @@ const MAX_BASE64_LENGTH = 8 * 1024 * 1024;
 const SUPPORTED_MEDIA_TYPES: ImageMediaType[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function handleIdentify(request: Request, env: Env): Promise<Response> {
+  const startedAt = Date.now();
   let body: IdentifyRequestBody;
   try {
     body = await request.json();
@@ -38,8 +39,9 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
   let result;
   try {
     result = await identifyCar(env.ANTHROPIC_API_KEY, imageBase64, mediaType);
+    console.log(`identifyCar took ${Date.now() - startedAt}ms`);
   } catch (err) {
-    console.error("Identification call failed", err);
+    console.error(`Identification call failed after ${Date.now() - startedAt}ms`, err);
     return jsonResponse(
       { identified: false, message: "Couldn't analyze that photo right now. Please try again." },
       502,
@@ -85,6 +87,7 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
     reference_images: referenceImages,
   };
 
+  console.log(`Total /api/identify took ${Date.now() - startedAt}ms`);
   return jsonResponse(response, 200);
 }
 

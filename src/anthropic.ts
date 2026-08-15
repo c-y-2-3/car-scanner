@@ -77,7 +77,7 @@ export async function identifyCar(
     // tool_use block, which then fails to parse and drops the result.
     thinking: { type: "adaptive" },
     output_config: {
-      effort: "medium",
+      effort: "low",
       format: { type: "json_schema", schema: CAR_SCHEMA },
     },
     tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 }],
