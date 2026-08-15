@@ -66,6 +66,7 @@ export async function identifyCar(
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 1024,
+    thinking: { type: "disabled" },
     output_config: {
       effort: "medium",
       format: { type: "json_schema", schema: IDENTIFY_SCHEMA },
@@ -108,15 +109,16 @@ export async function getCarFacts(apiKey: string, make: string, model: string, y
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 1536,
+    thinking: { type: "disabled" },
     output_config: {
       effort: "low",
       format: { type: "json_schema", schema: FACTS_SCHEMA },
     },
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2 }],
     messages: [
       {
         role: "user",
-        content: `Search the web for a few key facts and a rough current used-market price range in USD for a ${label}. Then summarize what you found.`,
+        content: `In a single web search, look up a few key facts and a rough current used-market price range in USD for a ${label}. Then summarize what you found.`,
       },
     ],
   });
