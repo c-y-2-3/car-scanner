@@ -78,10 +78,15 @@ export async function identifyCar(
     // tool_use block, which then fails to parse and drops the result.
     thinking: { type: "adaptive" },
     output_config: {
-      effort: "low",
+      effort: "medium",
       format: { type: "json_schema", schema: CAR_SCHEMA },
     },
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 }],
+    // The 20260209 tool runs an automatic code-execution filtering pass on
+    // search results, which timing logs showed costing ~4.6s on its own.
+    // We only need a couple of facts and a price range, not that level of
+    // result curation, so the older/simpler variant trades a bit of result
+    // sophistication for real latency.
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
     messages: [
       {
         role: "user",
