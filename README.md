@@ -52,11 +52,10 @@ wrangler.toml
 
 ## How it works
 
-`POST /api/identify` takes a base64 JPEG (client-resized to ~1200px, quality 0.8) and:
+The scan happens in two requests, so identification shows up fast instead of waiting behind a slower facts/photo lookup:
 
-1. Calls Claude (`claude-sonnet-5`, vision) with a strict JSON schema (structured outputs) to identify make/model/year-range/confidence. Low-confidence or non-car photos return a clear "couldn't identify" response instead of a confident-sounding guess.
-2. In parallel, calls Claude again with the web search tool for a few facts + a price estimate, and calls the Google Custom Search API for 2–3 reference photos.
-3. Merges everything into one response. If the facts or image lookups fail, the response still succeeds with an empty facts list or reference-photo list — a single degraded dependency doesn't fail the whole scan.
+1. **`POST /api/identify`** takes a base64 JPEG (client-resized to ~1200px, quality 0.8) and calls Claude (`claude-sonnet-5`, vision, thinking disabled for speed) with a strict JSON schema (structured outputs) to identify make/model/year-range/confidence. Low-confidence or non-car photos return a clear "couldn't identify" response instead of a confident-sounding guess. The frontend renders this as soon as it comes back.
+2. **`POST /api/enrich`** — fired by the frontend immediately after identification succeeds — calls Claude again (web search tool, single search round) for a few facts + a price estimate, in parallel with a Google Custom Search call for 2–3 reference photos. The results screen shows a small "looking up facts, price & reference photos…" indicator while this is in flight, then fills those sections in. If either lookup fails, the response still succeeds with an empty facts list or reference-photo list — a single degraded dependency doesn't fail the scan.
 
 ## Out of scope for v1
 

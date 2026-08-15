@@ -1,5 +1,4 @@
-import { getCarFacts, identifyCar } from "./anthropic";
-import { searchReferenceImages } from "./google";
+import { identifyCar } from "./anthropic";
 import type { Env, IdentifyRequestBody, IdentifyResponse, ImageMediaType } from "./types";
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
@@ -58,38 +57,15 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
     });
   }
 
-  const make = identification.make;
-  const model = identification.model;
-  const yearRange = identification.year_range ?? "";
-
-  const canSearchImages = Boolean(env.GOOGLE_CSE_API_KEY && env.GOOGLE_CSE_CX);
-
-  const [factsResult, imagesResult] = await Promise.allSettled([
-    getCarFacts(env.ANTHROPIC_API_KEY, make, model, yearRange),
-    canSearchImages
-      ? searchReferenceImages(env.GOOGLE_CSE_API_KEY, env.GOOGLE_CSE_CX, `${yearRange} ${make} ${model}`.trim())
-      : Promise.resolve([]),
-  ]);
-
-  if (factsResult.status === "rejected") {
-    console.error("Facts lookup failed", factsResult.reason);
-  }
-  if (imagesResult.status === "rejected") {
-    console.error("Reference image search failed", imagesResult.reason);
-  }
-
   const response: IdentifyResponse = {
     identified: true,
-    make,
-    model,
+    make: identification.make,
+    model: identification.model,
     year_range: identification.year_range ?? undefined,
     confidence: identification.confidence,
     low_confidence: identification.confidence < LOW_CONFIDENCE_THRESHOLD,
     summary: identification.summary ?? undefined,
     distinguishing_features: identification.distinguishing_features ?? undefined,
-    facts: factsResult.status === "fulfilled" ? factsResult.value.facts : [],
-    price_estimate: factsResult.status === "fulfilled" ? factsResult.value.price_estimate : null,
-    reference_images: imagesResult.status === "fulfilled" ? imagesResult.value : [],
   };
 
   return jsonResponse(response, 200);

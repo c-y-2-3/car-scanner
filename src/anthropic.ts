@@ -114,7 +114,7 @@ export async function getCarFacts(apiKey: string, make: string, model: string, y
       effort: "low",
       format: { type: "json_schema", schema: FACTS_SCHEMA },
     },
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2 }],
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 }],
     messages: [
       {
         role: "user",

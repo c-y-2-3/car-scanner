@@ -43,7 +43,16 @@ export interface IdentifyResponse {
   low_confidence?: boolean;
   summary?: string;
   distinguishing_features?: string;
-  facts?: string[];
-  price_estimate?: string | null;
-  reference_images?: ReferenceImage[];
+}
+
+export interface EnrichRequestBody {
+  make: string;
+  model: string;
+  year_range?: string;
+}
+
+export interface EnrichResponse {
+  facts: string[];
+  price_estimate: string | null;
+  reference_images: ReferenceImage[];
 }
