@@ -79,8 +79,14 @@ scanButton.addEventListener("click", async () => {
     if (!res.ok && !("identified" in data)) {
       throw new Error(data.message || "Something went wrong.");
     }
-    renderResults(data);
+    renderIdentification(data);
     showScreen(resultsScreen);
+
+    // Facts, price, and reference photos load in separately so the
+    // identification itself shows up as soon as it's ready.
+    if (data.identified) {
+      fetchEnrichment(data.make, data.model, data.year_range);
+    }
   } catch (err) {
     console.error(err);
     showScreen(captureScreen);
@@ -88,17 +94,45 @@ scanButton.addEventListener("click", async () => {
   }
 });
 
+async function fetchEnrichment(make, model, yearRange) {
+  const enrichLoading = document.getElementById("enrich-loading");
+  enrichLoading.classList.remove("hidden");
+
+  try {
+    const res = await fetch("/api/enrich", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ make, model, year_range: yearRange }),
+    });
+    const data = await res.json();
+    renderEnrichment(data);
+  } catch (err) {
+    console.error("Enrichment failed", err);
+    renderEnrichment({ facts: [], price_estimate: null, reference_images: [] });
+  } finally {
+    enrichLoading.classList.add("hidden");
+  }
+}
+
 scanAnotherButton.addEventListener("click", () => {
   resetCapture();
   clearError();
   showScreen(captureScreen);
 });
 
-function renderResults(data) {
+function renderIdentification(data) {
   const resultContent = document.getElementById("result-content");
   const notIdentified = document.getElementById("not-identified");
 
   document.getElementById("scanned-photo").src = currentImageDataUrl || "";
+
+  // Clear any facts/price/photos left over from a previous scan.
+  document.getElementById("enrich-loading").classList.add("hidden");
+  document.getElementById("facts-section").classList.add("hidden");
+  document.getElementById("facts-list").innerHTML = "";
+  document.getElementById("price-estimate").classList.add("hidden");
+  document.getElementById("reference-section").classList.add("hidden");
+  document.getElementById("reference-images").innerHTML = "";
 
   if (!data.identified) {
     resultContent.classList.add("hidden");
@@ -119,7 +153,9 @@ function renderResults(data) {
 
   document.getElementById("low-confidence-banner").classList.toggle("hidden", !data.low_confidence);
   document.getElementById("result-summary").textContent = data.summary || "";
+}
 
+function renderEnrichment(data) {
   const factsList = document.getElementById("facts-list");
   factsList.innerHTML = "";
   (data.facts || []).forEach((fact) => {
