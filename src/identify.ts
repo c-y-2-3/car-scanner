@@ -1,4 +1,5 @@
 import { identifyCar } from "./anthropic";
+import { searchReferenceImages } from "./google";
 import type { Env, IdentifyRequestBody, IdentifyResponse, ImageMediaType } from "./types";
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
@@ -34,9 +35,9 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
     );
   }
 
-  let identification;
+  let result;
   try {
-    identification = await identifyCar(env.ANTHROPIC_API_KEY, imageBase64, mediaType);
+    result = await identifyCar(env.ANTHROPIC_API_KEY, imageBase64, mediaType);
   } catch (err) {
     console.error("Identification call failed", err);
     return jsonResponse(
@@ -45,27 +46,43 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
     );
   }
 
-  if (
-    !identification.is_car ||
-    !identification.make ||
-    !identification.model ||
-    identification.confidence < MIN_CONFIDENCE_TO_IDENTIFY
-  ) {
+  if (!result.is_car || !result.make || !result.model || result.confidence < MIN_CONFIDENCE_TO_IDENTIFY) {
     return jsonResponse({
       identified: false,
       message: "Couldn't confidently identify a car in this photo. Try a clearer shot of the front or side of the vehicle.",
     });
   }
 
+  const make = result.make;
+  const model = result.model;
+  const yearRange = result.year_range ?? "";
+  const canSearchImages = Boolean(env.GOOGLE_CSE_API_KEY && env.GOOGLE_CSE_CX);
+
+  let referenceImages: IdentifyResponse["reference_images"] = [];
+  if (canSearchImages) {
+    try {
+      referenceImages = await searchReferenceImages(
+        env.GOOGLE_CSE_API_KEY,
+        env.GOOGLE_CSE_CX,
+        `${yearRange} ${make} ${model}`.trim(),
+      );
+    } catch (err) {
+      console.error("Reference image search failed", err);
+    }
+  }
+
   const response: IdentifyResponse = {
     identified: true,
-    make: identification.make,
-    model: identification.model,
-    year_range: identification.year_range ?? undefined,
-    confidence: identification.confidence,
-    low_confidence: identification.confidence < LOW_CONFIDENCE_THRESHOLD,
-    summary: identification.summary ?? undefined,
-    distinguishing_features: identification.distinguishing_features ?? undefined,
+    make,
+    model,
+    year_range: result.year_range ?? undefined,
+    confidence: result.confidence,
+    low_confidence: result.confidence < LOW_CONFIDENCE_THRESHOLD,
+    summary: result.summary ?? undefined,
+    distinguishing_features: result.distinguishing_features ?? undefined,
+    facts: result.facts,
+    price_estimate: result.price_estimate,
+    reference_images: referenceImages,
   };
 
   return jsonResponse(response, 200);

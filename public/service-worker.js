@@ -1,4 +1,4 @@
-const CACHE_NAME = "car-scanner-shell-v1";
+const CACHE_NAME = "car-scanner-shell-v2";
 const APP_SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
@@ -27,16 +27,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Network-first for the app shell: a redeploy should reach the phone on
+  // the very next load, not get stuck behind whatever was cached the last
+  // time this PWA was opened. Cache is only used as an offline fallback,
+  // and is refreshed on every successful network fetch.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
+    fetch(event.request)
+      .then((response) => {
         if (response.ok && response.type === "basic") {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(event.request)),
   );
 });

@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { CarFacts, CarIdentification, ImageMediaType } from "./types";
+import type { CarResult, ImageMediaType } from "./types";
 
 const MODEL = "claude-sonnet-5";
 
-const IDENTIFY_SCHEMA = {
+const CAR_SCHEMA = {
   type: "object",
   properties: {
     is_car: {
@@ -28,25 +28,29 @@ const IDENTIFY_SCHEMA = {
       type: ["string", "null"],
       description: "1-2 sentence summary of the car.",
     },
-  },
-  required: ["is_car", "make", "model", "year_range", "confidence", "distinguishing_features", "summary"],
-  additionalProperties: false,
-} as const;
-
-const FACTS_SCHEMA = {
-  type: "object",
-  properties: {
     facts: {
       type: "array",
       items: { type: "string" },
-      description: "Exactly 2-3 short, interesting, factual bullet points about this car. Each one sentence, no filler.",
+      description:
+        "Exactly 2-3 short, interesting facts about this car, one sentence each, no filler. Empty array if is_car is false or you couldn't identify it.",
     },
     price_estimate: {
       type: ["string", "null"],
-      description: "A brief current used-market price range in USD, e.g. '$18,000-$24,000'. At most one short clarifying clause after it if genuinely needed (e.g. 'depending on trim') — otherwise just the range. Null if you can't find a reliable estimate.",
+      description:
+        "A brief current used-market price range in USD, e.g. '$18,000-$24,000'. At most one short clarifying clause after it if genuinely needed. Null if is_car is false, you couldn't identify it, or you can't find a reliable estimate.",
     },
   },
-  required: ["facts", "price_estimate"],
+  required: [
+    "is_car",
+    "make",
+    "model",
+    "year_range",
+    "confidence",
+    "distinguishing_features",
+    "summary",
+    "facts",
+    "price_estimate",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -60,17 +64,23 @@ export async function identifyCar(
   apiKey: string,
   imageBase64: string,
   mediaType: ImageMediaType,
-): Promise<CarIdentification> {
+): Promise<CarResult> {
   const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 1024,
-    thinking: { type: "disabled" },
+    max_tokens: 1536,
+    // Thinking stays on (adaptive, the default) rather than disabled: this
+    // call can use the web_search tool, and disabling thinking alongside
+    // tool use + a forced JSON schema is a known bad combination — the
+    // model can write the tool call as plain text instead of an actual
+    // tool_use block, which then fails to parse and drops the result.
+    thinking: { type: "adaptive" },
     output_config: {
       effort: "medium",
-      format: { type: "json_schema", schema: IDENTIFY_SCHEMA },
+      format: { type: "json_schema", schema: CAR_SCHEMA },
     },
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 }],
     messages: [
       {
         role: "user",
@@ -82,11 +92,15 @@ export async function identifyCar(
           {
             type: "text",
             text: [
-              "You are identifying a car from a photo. Look carefully at the body shape, badges, grille, headlights, taillights, and overall proportions.",
+              "You are identifying a car from a photo, and if you can identify it, providing a couple of facts and a price estimate.",
               "",
-              "If the photo does not clearly show a car — a different kind of vehicle, an unrelated object, a person, or something too blurry or obscured to judge — set is_car to false, confidence to 0, and leave the other fields null.",
+              "Step 1: look carefully at the body shape, badges, grille, headlights, taillights, and overall proportions.",
               "",
-              "If it is a car, identify the make, model, and a year range rather than a single year, since styling changes are often subtle year to year (e.g. \"2018-2020\"). Set confidence between 0 and 1 based on how sure you actually are — an honest low-confidence answer is better than a confident wrong one. Note the visual details you used to identify it, and write a short summary.",
+              'If the photo does not clearly show a car — a different kind of vehicle, an unrelated object, a person, or something too blurry or obscured to judge — set is_car to false, confidence to 0, leave make/model/year_range/distinguishing_features/summary null, leave facts as an empty array, and price_estimate null. Do not use the web_search tool in this case.',
+              "",
+              'If it is a car: identify the make, model, and a year range rather than a single year, since styling changes are often subtle year to year (e.g. "2018-2020"). Set confidence between 0 and 1 based on how sure you actually are — an honest low-confidence answer is better than a confident wrong one. Note the visual details you used to identify it, and write a short summary.',
+              "",
+              "Step 2: only if you identified the car with reasonable confidence, use the web_search tool once to look up 2-3 short, interesting facts and a brief current used-market price range in USD. Keep both concise — no filler, no lengthy explanation.",
             ].join("\n"),
           },
         ],
@@ -98,41 +112,7 @@ export async function identifyCar(
     throw new RefusedError("identification");
   }
 
-  return parseJsonResponse(response, validateIdentification);
-}
-
-export async function getCarFacts(apiKey: string, make: string, model: string, yearRange: string): Promise<CarFacts> {
-  const client = new Anthropic({ apiKey });
-
-  const label = [yearRange, make, model].filter(Boolean).join(" ");
-
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1536,
-    // Thinking stays on (adaptive) here — unlike the identify call, this one
-    // uses a tool. Disabling thinking alongside tool use + a forced JSON
-    // schema can make the model write the tool call as plain text instead
-    // of an actual tool_use block, which then fails to parse as JSON and
-    // silently drops the whole result.
-    thinking: { type: "adaptive" },
-    output_config: {
-      effort: "low",
-      format: { type: "json_schema", schema: FACTS_SCHEMA },
-    },
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 }],
-    messages: [
-      {
-        role: "user",
-        content: `In a single web search, look up 2-3 short, interesting facts and a brief current used-market price range in USD for a ${label}. Keep the facts and the price estimate concise — no filler, no lengthy explanation.`,
-      },
-    ],
-  });
-
-  if (response.stop_reason === "refusal") {
-    throw new RefusedError("facts lookup");
-  }
-
-  return parseJsonResponse(response, validateFacts);
+  return parseJsonResponse(response, validateCarResult);
 }
 
 function parseJsonResponse<T>(response: Anthropic.Message, validate: (value: unknown) => T): T {
@@ -155,13 +135,15 @@ function parseJsonResponse<T>(response: Anthropic.Message, validate: (value: unk
   return validate(parsed);
 }
 
-function validateIdentification(value: unknown): CarIdentification {
+function validateCarResult(value: unknown): CarResult {
   if (typeof value !== "object" || value === null) {
-    throw new Error("Identification response was not an object");
+    throw new Error("Response was not an object");
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.is_car !== "boolean") throw new Error("Identification response missing is_car");
-  if (typeof v.confidence !== "number") throw new Error("Identification response missing confidence");
+  if (typeof v.is_car !== "boolean") throw new Error("Response missing is_car");
+  if (typeof v.confidence !== "number") throw new Error("Response missing confidence");
+
+  const facts = Array.isArray(v.facts) ? v.facts.filter((f): f is string => typeof f === "string") : [];
 
   return {
     is_car: v.is_car,
@@ -171,17 +153,6 @@ function validateIdentification(value: unknown): CarIdentification {
     confidence: Math.max(0, Math.min(1, v.confidence)),
     distinguishing_features: typeof v.distinguishing_features === "string" ? v.distinguishing_features : null,
     summary: typeof v.summary === "string" ? v.summary : null,
-  };
-}
-
-function validateFacts(value: unknown): CarFacts {
-  if (typeof value !== "object" || value === null) {
-    throw new Error("Facts response was not an object");
-  }
-  const v = value as Record<string, unknown>;
-  const facts = Array.isArray(v.facts) ? v.facts.filter((f): f is string => typeof f === "string") : [];
-
-  return {
     facts,
     price_estimate: typeof v.price_estimate === "string" ? v.price_estimate : null,
   };
