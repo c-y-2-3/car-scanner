@@ -39,11 +39,11 @@ const FACTS_SCHEMA = {
     facts: {
       type: "array",
       items: { type: "string" },
-      description: "3-5 short, interesting, factual bullet points about this car.",
+      description: "Exactly 2-3 short, interesting, factual bullet points about this car. Each one sentence, no filler.",
     },
     price_estimate: {
       type: ["string", "null"],
-      description: "Rough current used-market price range in USD, e.g. '$18,000-$24,000'. Null if you can't find a reliable estimate.",
+      description: "A brief current used-market price range in USD, e.g. '$18,000-$24,000'. At most one short clarifying clause after it if genuinely needed (e.g. 'depending on trim') — otherwise just the range. Null if you can't find a reliable estimate.",
     },
   },
   required: ["facts", "price_estimate"],
@@ -109,7 +109,12 @@ export async function getCarFacts(apiKey: string, make: string, model: string, y
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 1536,
-    thinking: { type: "disabled" },
+    // Thinking stays on (adaptive) here — unlike the identify call, this one
+    // uses a tool. Disabling thinking alongside tool use + a forced JSON
+    // schema can make the model write the tool call as plain text instead
+    // of an actual tool_use block, which then fails to parse as JSON and
+    // silently drops the whole result.
+    thinking: { type: "adaptive" },
     output_config: {
       effort: "low",
       format: { type: "json_schema", schema: FACTS_SCHEMA },
@@ -118,7 +123,7 @@ export async function getCarFacts(apiKey: string, make: string, model: string, y
     messages: [
       {
         role: "user",
-        content: `In a single web search, look up a few key facts and a rough current used-market price range in USD for a ${label}. Then summarize what you found.`,
+        content: `In a single web search, look up 2-3 short, interesting facts and a brief current used-market price range in USD for a ${label}. Keep the facts and the price estimate concise — no filler, no lengthy explanation.`,
       },
     ],
   });
@@ -136,14 +141,15 @@ function parseJsonResponse<T>(response: Anthropic.Message, validate: (value: unk
   );
   const lastText = textBlocks[textBlocks.length - 1];
   if (!lastText) {
-    throw new Error("Model returned no text content");
+    const blockTypes = response.content.map((b) => b.type).join(", ") || "none";
+    throw new Error(`Model returned no text content (stop_reason=${response.stop_reason}, blocks=[${blockTypes}])`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(lastText.text);
   } catch {
-    throw new Error("Model did not return valid JSON");
+    throw new Error(`Model did not return valid JSON (stop_reason=${response.stop_reason}): ${lastText.text.slice(0, 200)}`);
   }
 
   return validate(parsed);
