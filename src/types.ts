@@ -12,7 +12,7 @@ export interface IdentifyRequestBody {
   mediaType?: string;
 }
 
-export interface CarIdentification {
+export interface CarResult {
   is_car: boolean;
   make: string | null;
   model: string | null;
@@ -20,9 +20,6 @@ export interface CarIdentification {
   confidence: number;
   distinguishing_features: string | null;
   summary: string | null;
-}
-
-export interface CarFacts {
   facts: string[];
   price_estimate: string | null;
 }
@@ -43,16 +40,7 @@ export interface IdentifyResponse {
   low_confidence?: boolean;
   summary?: string;
   distinguishing_features?: string;
-}
-
-export interface EnrichRequestBody {
-  make: string;
-  model: string;
-  year_range?: string;
-}
-
-export interface EnrichResponse {
-  facts: string[];
-  price_estimate: string | null;
-  reference_images: ReferenceImage[];
+  facts?: string[];
+  price_estimate?: string | null;
+  reference_images?: ReferenceImage[];
 }

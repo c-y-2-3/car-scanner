@@ -52,10 +52,13 @@ wrangler.toml
 
 ## How it works
 
-The scan happens in two requests, so identification shows up fast instead of waiting behind a slower facts/photo lookup:
+`POST /api/identify` takes a base64 JPEG (client-resized to ~1200px, quality 0.8) and:
 
-1. **`POST /api/identify`** takes a base64 JPEG (client-resized to ~1200px, quality 0.8) and calls Claude (`claude-sonnet-5`, vision, thinking disabled for speed) with a strict JSON schema (structured outputs) to identify make/model/year-range/confidence. Low-confidence or non-car photos return a clear "couldn't identify" response instead of a confident-sounding guess. The frontend renders this as soon as it comes back.
-2. **`POST /api/enrich`** — fired by the frontend immediately after identification succeeds — calls Claude again (web search tool, single search round) for a few facts + a price estimate, in parallel with a Google Custom Search call for 2–3 reference photos. The results screen shows a small "looking up facts, price & reference photos…" indicator while this is in flight, then fills those sections in. If either lookup fails, the response still succeeds with an empty facts list or reference-photo list — a single degraded dependency doesn't fail the scan.
+1. Calls Claude (`claude-sonnet-5`, vision + the web search tool, structured outputs) once to identify make/model/year-range/confidence, and — if it identified the car with reasonable confidence — 2-3 short facts and a brief price estimate in the same call. Low-confidence or non-car photos return a clear "couldn't identify" response instead of a confident-sounding guess, and skip the web search entirely.
+2. Once it has a make/model, calls the Google Custom Search API for 2–3 reference photos.
+3. Merges everything into one response. If the reference-photo lookup fails, the response still succeeds with an empty photo list — a degraded dependency doesn't fail the whole scan.
+
+The service worker caches the app shell network-first (not cache-first) — it always tries the network before falling back to the cache, so a redeploy reaches the app on the next load instead of getting stuck behind a stale cached version.
 
 ## Out of scope for v1
 

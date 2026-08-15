@@ -1,4 +1,3 @@
-import { handleEnrich } from "./enrich";
 import { handleIdentify } from "./identify";
 import type { Env } from "./types";
 
@@ -11,13 +10,6 @@ export default {
         return jsonError("Method not allowed", 405);
       }
       return handleIdentify(request, env);
-    }
-
-    if (url.pathname === "/api/enrich") {
-      if (request.method !== "POST") {
-        return jsonError("Method not allowed", 405);
-      }
-      return handleEnrich(request, env);
     }
 
     if (url.pathname.startsWith("/api/")) {
