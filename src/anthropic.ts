@@ -66,8 +66,9 @@ export async function identifyCar(
   mediaType: ImageMediaType,
 ): Promise<CarResult> {
   const client = new Anthropic({ apiKey });
+  const t0 = Date.now();
 
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: MODEL,
     max_tokens: 1536,
     // Thinking stays on (adaptive, the default) rather than disabled: this
@@ -107,6 +108,18 @@ export async function identifyCar(
       },
     ],
   });
+
+  for await (const event of stream) {
+    const elapsed = Date.now() - t0;
+    if (event.type === "content_block_start") {
+      console.log(`[timing] ${event.content_block.type} block started at ${elapsed}ms`);
+    } else if (event.type === "message_delta" && event.delta.stop_reason) {
+      console.log(`[timing] stop_reason=${event.delta.stop_reason} at ${elapsed}ms`);
+    }
+  }
+
+  const response = await stream.finalMessage();
+  console.log(`[timing] identifyCar total: ${Date.now() - t0}ms`);
 
   if (response.stop_reason === "refusal") {
     throw new RefusedError("identification");
