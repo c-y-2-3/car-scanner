@@ -1,5 +1,5 @@
 import { identifyCar } from "./anthropic";
-import { searchReferenceImages } from "./google";
+import { searchReferenceImages } from "./wikimedia";
 import type { Env, IdentifyRequestBody, IdentifyResponse, ImageMediaType } from "./types";
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
@@ -58,24 +58,13 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
   const make = result.make;
   const model = result.model;
   const yearRange = result.year_range ?? "";
-  const canSearchImages = Boolean(env.GOOGLE_CSE_API_KEY && env.GOOGLE_CSE_CX);
 
   let referenceImages: IdentifyResponse["reference_images"] = [];
-  if (canSearchImages) {
-    try {
-      referenceImages = await searchReferenceImages(
-        env.GOOGLE_CSE_API_KEY,
-        env.GOOGLE_CSE_CX,
-        `${yearRange} ${make} ${model}`.trim(),
-      );
-      console.log(`Reference image search returned ${referenceImages.length} results`);
-    } catch (err) {
-      console.error(`Reference image search failed: ${errorMessage(err)}`);
-    }
-  } else {
-    console.log(
-      `Reference image search skipped: GOOGLE_CSE_API_KEY ${env.GOOGLE_CSE_API_KEY ? "set" : "MISSING"}, GOOGLE_CSE_CX ${env.GOOGLE_CSE_CX ? "set" : "MISSING"}`,
-    );
+  try {
+    referenceImages = await searchReferenceImages(`${yearRange} ${make} ${model}`.trim());
+    console.log(`Reference image search returned ${referenceImages.length} results`);
+  } catch (err) {
+    console.error(`Reference image search failed: ${errorMessage(err)}`);
   }
 
   const response: IdentifyResponse = {
