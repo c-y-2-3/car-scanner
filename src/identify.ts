@@ -41,7 +41,7 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
     result = await identifyCar(env.ANTHROPIC_API_KEY, imageBase64, mediaType);
     console.log(`identifyCar took ${Date.now() - startedAt}ms`);
   } catch (err) {
-    console.error(`Identification call failed after ${Date.now() - startedAt}ms`, err);
+    console.error(`Identification call failed after ${Date.now() - startedAt}ms: ${errorMessage(err)}`);
     return jsonResponse(
       { identified: false, message: "Couldn't analyze that photo right now. Please try again." },
       502,
@@ -70,7 +70,7 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
       );
       console.log(`Reference image search returned ${referenceImages.length} results`);
     } catch (err) {
-      console.error("Reference image search failed", err);
+      console.error(`Reference image search failed: ${errorMessage(err)}`);
     }
   } else {
     console.log(
@@ -102,6 +102,10 @@ function parseImageInput(image: string, mediaTypeHint?: string): { data: string;
     return { data: dataUrlMatch[2], mediaType: coerceMediaType(dataUrlMatch[1]) };
   }
   return { data: image, mediaType: coerceMediaType(mediaTypeHint) };
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function coerceMediaType(value: string | undefined): ImageMediaType {
