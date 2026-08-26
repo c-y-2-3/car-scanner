@@ -1,8 +1,6 @@
 export interface Env {
   ASSETS: Fetcher;
   ANTHROPIC_API_KEY: string;
-  GOOGLE_CSE_API_KEY: string;
-  GOOGLE_CSE_CX: string;
 }
 
 export type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
