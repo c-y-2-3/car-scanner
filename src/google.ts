@@ -23,7 +23,8 @@ export async function searchReferenceImages(
 
   const res = await fetch(url.toString());
   if (!res.ok) {
-    throw new Error(`Google Custom Search request failed with status ${res.status}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`Google Custom Search request failed with status ${res.status}: ${body.slice(0, 500)}`);
   }
 
   const data = (await res.json()) as GoogleCseResponse;

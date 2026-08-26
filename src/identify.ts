@@ -68,9 +68,14 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
         env.GOOGLE_CSE_CX,
         `${yearRange} ${make} ${model}`.trim(),
       );
+      console.log(`Reference image search returned ${referenceImages.length} results`);
     } catch (err) {
       console.error("Reference image search failed", err);
     }
+  } else {
+    console.log(
+      `Reference image search skipped: GOOGLE_CSE_API_KEY ${env.GOOGLE_CSE_API_KEY ? "set" : "MISSING"}, GOOGLE_CSE_CX ${env.GOOGLE_CSE_CX ? "set" : "MISSING"}`,
+    );
   }
 
   const response: IdentifyResponse = {
