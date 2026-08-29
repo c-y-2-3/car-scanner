@@ -57,11 +57,10 @@ export async function handleIdentify(request: Request, env: Env): Promise<Respon
 
   const make = result.make;
   const model = result.model;
-  const yearRange = result.year_range ?? "";
 
   let referenceImages: IdentifyResponse["reference_images"] = [];
   try {
-    referenceImages = await searchReferenceImages(`${yearRange} ${make} ${model}`.trim());
+    referenceImages = await searchReferenceImages(make, model);
     console.log(`Reference image search returned ${referenceImages.length} results`);
   } catch (err) {
     console.error(`Reference image search failed: ${errorMessage(err)}`);
