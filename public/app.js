@@ -8,10 +8,6 @@ const loadingScreen = document.getElementById("loading-screen");
 const resultsScreen = document.getElementById("results-screen");
 
 const cameraInput = document.getElementById("camera-input");
-const previewImg = document.getElementById("preview-img");
-const previewWrap = document.getElementById("preview-wrap");
-const scanButton = document.getElementById("scan-button");
-const chooseAnotherButton = document.getElementById("choose-another-button");
 const scanAnotherButton = document.getElementById("scan-another-button");
 const errorBanner = document.getElementById("error-banner");
 const lightbox = document.getElementById("lightbox");
@@ -55,9 +51,6 @@ function clearError() {
 function resetCapture() {
   cameraInput.value = "";
   currentImageDataUrl = null;
-  previewWrap.classList.add("hidden");
-  scanButton.classList.add("hidden");
-  chooseAnotherButton.classList.add("hidden");
 }
 
 cameraInput.addEventListener("change", async () => {
@@ -67,24 +60,16 @@ cameraInput.addEventListener("change", async () => {
 
   try {
     currentImageDataUrl = await resizeAndCompress(file, CONFIG.maxDimension, CONFIG.jpegQuality);
-    previewImg.src = currentImageDataUrl;
-    previewWrap.classList.remove("hidden");
-    scanButton.classList.remove("hidden");
-    chooseAnotherButton.classList.remove("hidden");
   } catch (err) {
     console.error(err);
     showError("Couldn't process that photo. Try another one.");
+    return;
   }
+
+  await scanCar();
 });
 
-chooseAnotherButton.addEventListener("click", () => {
-  resetCapture();
-  clearError();
-});
-
-scanButton.addEventListener("click", async () => {
-  if (!currentImageDataUrl) return;
-  clearError();
+async function scanCar() {
   showScreen(loadingScreen);
 
   try {
@@ -105,7 +90,7 @@ scanButton.addEventListener("click", async () => {
     showScreen(captureScreen);
     showError(err.message || "Something went wrong. Please try again.");
   }
-});
+}
 
 scanAnotherButton.addEventListener("click", () => {
   resetCapture();
