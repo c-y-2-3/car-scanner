@@ -14,8 +14,27 @@ const scanButton = document.getElementById("scan-button");
 const chooseAnotherButton = document.getElementById("choose-another-button");
 const scanAnotherButton = document.getElementById("scan-another-button");
 const errorBanner = document.getElementById("error-banner");
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+const lightboxClose = document.getElementById("lightbox-close");
 
 let currentImageDataUrl = null;
+
+function openLightbox(url, alt) {
+  lightboxImg.src = url;
+  lightboxImg.alt = alt || "Reference photo";
+  lightbox.classList.remove("hidden");
+}
+
+function closeLightbox() {
+  lightbox.classList.add("hidden");
+  lightboxImg.src = "";
+}
+
+lightboxClose.addEventListener("click", closeLightbox);
+lightbox.addEventListener("click", (event) => {
+  if (event.target === lightbox) closeLightbox();
+});
 
 function showScreen(screen) {
   for (const el of [captureScreen, loadingScreen, resultsScreen]) {
@@ -141,14 +160,20 @@ function renderResults(data) {
   refGrid.innerHTML = "";
   (data.reference_images || []).forEach((img) => {
     const figure = document.createElement("figure");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "reference-thumb-button";
+    button.setAttribute("aria-label", `View larger photo: ${img.title || "reference photo"}`);
     const imageEl = document.createElement("img");
     imageEl.src = img.url;
     imageEl.alt = img.title || "Reference photo";
     imageEl.loading = "lazy";
     imageEl.referrerPolicy = "no-referrer";
+    button.appendChild(imageEl);
+    button.addEventListener("click", () => openLightbox(img.full_url || img.url, img.title));
     const caption = document.createElement("figcaption");
     caption.textContent = img.source || "Reference image";
-    figure.appendChild(imageEl);
+    figure.appendChild(button);
     figure.appendChild(caption);
     refGrid.appendChild(figure);
   });

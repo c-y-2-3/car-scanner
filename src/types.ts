@@ -24,6 +24,7 @@ export interface CarResult {
 
 export interface ReferenceImage {
   url: string;
+  full_url: string;
   title: string;
   source: string;
 }
